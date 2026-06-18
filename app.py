@@ -1,64 +1,44 @@
 import streamlit as st
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-st.set_page_config(page_title='Chennai Flood Risk', page_icon='🌊', layout='wide')
+st.set_page_config(page_title="Chennai Flood Risk Predictor", page_icon="🌊")
+st.title("🌊 Chennai Flood Risk Predictor 2015")
+st.write("Data Source: data.gov.in Statistical Handbook 2018")
 
-st.title('🌊 Chennai Flood Risk Predictor 2015')
-st.write('**Data Source:** data.gov.in Statistical Handbook 2018 | **Model Accuracy: 100%**')
-st.markdown('---')
+# Data Load
+df = pd.read_csv("rainfall.csv") # உன் CSV file name
+X = df[["Actual_Rainfall", "Normal_Rainfall"]] 
+y = df["Flood"] # 1=Yes, 0=No னு இருக்கணும்
 
-# Data Load & Model Train
-df = pd.read_csv('rainfall.csv')
-df['Excess_Rain'] = df['Actual_Rainfall'] - df['Normal_Rainfall']
-X = df[['Actual_Rainfall', 'Excess_Rain']]
-y = df['Flood']
-model = LogisticRegression()
-model.fit(X, y)
+# Train Model
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
 
-# Layout
-col1, col2 = st.columns([1, 2])
+# Accuracy Calculate பண்ணு - Real Value
+y_pred = model.predict(X_test)
+acc = accuracy_score(y_test, y_pred) * 100
+st.write(f"**Model Accuracy: {acc:.1f}%**") # ← இப்போ 100% வராது
 
+# UI
+col1, col2 = st.columns(2)
 with col1:
-    st.subheader('🔢 Input Rainfall Data')
-    actual = st.number_input('Actual Rainfall (mm)', value=1126.8, min_value=0.0)
-    normal = st.number_input('Normal Rainfall (mm)', value=971.8, min_value=0.0)
+    st.subheader("📊 Input Rainfall Data")
+    actual = st.number_input("Actual Rainfall (mm)", 0.0, 2000.0, 1126.80)
+    normal = st.number_input("Normal Rainfall (mm)", 0.0, 2000.0, 971.80)
     excess = actual - normal
-    st.info(f'Excess Rainfall: {excess:.1f} mm')
-
-    if st.button('🚀 Predict Flood Risk', type='primary', use_container_width=True):
-        risk = model.predict_proba([[actual, excess]])[0][1] * 100
-        st.session_state['risk'] = risk
-        st.session_state['predicted'] = True
-
-with col2:
-    st.subheader('📊 Prediction Result')
-    if 'predicted' in st.session_state:
-        risk = st.session_state['risk']
-        st.metric('Flood Risk Probability', f'{risk:.1f}%')
-        st.metric('Model Accuracy', '100%')
-
-        if risk > 70:
-            st.error('⚠️ HIGH FLOOD RISK - Immediate Action Needed')
-        elif risk > 40:
-            st.warning('⚡ MODERATE RISK - Stay Alert')
-        else:
-            st.success('✅ LOW RISK - Safe Condition')
-    else:
-        st.info('👆 Enter values and click Predict to see results')
-
-st.markdown('---')
-st.subheader('📈 Historical Data: 2003-2016')
-fig, ax = plt.subplots(figsize=(12, 5))
-colors = ['#ff4444' if x == 1 else '#4444ff' for x in df['Flood']]
-ax.bar(df['Year'], df['Actual_Rainfall'], color=colors, alpha=0.7, label='Actual Rainfall')
-ax.plot(df['Year'], df['Normal_Rainfall'], 'o-', color='orange', linewidth=2, label='Normal Rainfall')
-ax.set_ylabel('Rainfall (mm)')
-ax.set_xlabel('Financial Year')
-ax.set_title('Actual vs Normal Rainfall | Red = Flood Year')
-ax.legend()
-plt.xticks(rotation=45)
-st.pyplot(fig)
-
-st.caption('Built with Kiro IDE | Final Year Project 2026')
+    st.info(f"Excess Rainfall: {excess:.1f} mm")
+    
+    if st.button("🔮 Predict Flood Risk"):
+        result = model.predict([[actual, normal]])
+        prob = model.predict_proba([[actual, normal]])
+        
+        with col2:
+            st.subheader("📈 Prediction Result")
+            if result[0] == 1:
+                st.error(f"⚠️ High Flood Risk! Probability: {prob[0][1]*100:.1f}%")
+            else:
+                st.success(f"✅ Low Flood Risk. Probability: {prob[0][0]*100:.1f}%")
